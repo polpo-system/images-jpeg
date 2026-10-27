@@ -11,15 +11,22 @@ portia.Install images-jpeg
 ## What is here
 
     src/OLR.JPEGImages.Mod
-    test/JPEGImagesTest.Mod, zq_test.jpg (3 by 2 pixels)
+    test/JPEGImagesTest.Mod, zq_test.jpg (3 by 2 pixels), zq_big.jpg (2600 by 1400),
+      zq_wide.jpg (12000 by 16)
 
 The source comes from ETH Linux Oberon (OLR, 2017-06-18), converted from an Oberon text to plain
-text; the first commit has it unchanged. It compiles unchanged with all five of polpo's compilers
-(x86, ARM, ARMv7, RISC-V, MIPS). It reads baseline JPEG; it does not write JPEG.
+text; the first commit has it unchanged. It reads baseline JPEG; it does not write JPEG.
+
+The original took pictures of up to 1024 by 1024 pixels: its sample rows were arrays of a fixed
+length. Here the rows are as long as the picture is wide, and pictures of up to 32767 by 32767
+are read (Pictures take their sizes as INTEGER); the offsets in a row are LONGINT, since a row
+of 32767 pixels has 98301 bytes. A picture of 4000 by 3000 takes about 4 seconds on x86. It
+compiles with all of polpo's compilers.
 
 ## Tests
 
-    JPEGImagesTest.Run      2 checks: a 3 by 2 JPEG loaded; it needs the desktop's display
+    JPEGImagesTest.Run      8 checks: a 3 by 2 JPEG loaded, and two bigger ones with their size and
+                            the colours of their halves; it needs the desktop's display
 
 The license is GPL-3 (`LICENSE`); the code comes from ETH Oberon, whose license (`LICENSE.ETH`)
 asks to keep its copyright notice and conditions, which `LICENSE.ETH` does.
