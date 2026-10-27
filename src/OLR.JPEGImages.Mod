@@ -57,7 +57,7 @@ CONST
 	MAXCOMPONENTS = 4;  (* nach JFIF bis 10 *)
 	MAXJSAMPLE = 255;
 	CENTERJSAMPLE = 128;
-	JPEGMAXDIMENSION = 1024;  (* nach JFIF bis 65500 *)
+	JPEGMAXDIMENSION = 32767;  (* nach JFIF bis 65500; polpo: was 1024, Pictures take INTEGER sizes *)
 	MAXQCOMPS = 4;
 	HUFFLOOKAHEAD = 8;
 	MINGETBITS = 25;
@@ -163,7 +163,7 @@ TYPE
 			file: F.File;
 	END;
 	
-	JSampRow = POINTER TO ARRAY (JPEGMAXDIMENSION * RGBPIXELSIZE) OF CHAR; (*es: 1024 x 3 *)
+	JSampRow = POINTER TO ARRAY OF CHAR; (* polpo: rowLen long, was 1024 x 3 *)
 	
 	(*es*) 
 	JSampRowList = POINTER TO JSampRowListDesc;
@@ -213,7 +213,7 @@ TYPE
 											outputRow, outputCol: LONGINT);
 	END;
 	
-	FSErrPtr = POINTER TO ARRAY (JPEGMAXDIMENSION + 2) OF INTEGER;
+	FSErrPtr = POINTER TO ARRAY OF INTEGER;  (* polpo: the output width + 2, was JPEGMAXDIMENSION + 2 *)
 	
 	ColIndexPtr = POINTER TO ColIndex;
 	ColIndex = ARRAY 3, (MAXJSAMPLE + 1) OF INTEGER;
@@ -434,6 +434,7 @@ VAR
 	dots: POINTER TO ARRAY OF INTEGER;
 	err: INTEGER;
 	(*es*) nIDCT: LONGINT; bmpF: Files.File; bmpR: Files.Rider; bmpRows: JSampRowList;
+	rowLen: LONGINT;  (* polpo: the length of a sample row: the width, block padding, 3 bytes a pixel *)
 	
 	PROCEDURE ^ Handle* (obj: Objects.Object; VAR msg: Objects.ObjMsg);
 
@@ -633,6 +634,7 @@ VAR
 		THEN
 			ErrMsg("image too large", 4)
 		END;
+		rowLen := (cInfo.imageWidth + 2 * MAXSAMPFACTOR * DCTSIZE) * RGBPIXELSIZE;
 		
 		IF cInfo.dataPrecision # BITSINJSAMPLE THEN
 			ErrMsg("data-precision # 8", 5)
@@ -2281,7 +2283,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 											numRows:INTEGER; numCols: LONGINT);
 	VAR
 		outptr,inptr: JSampRow;
-		row,i,j: INTEGER;
+		row: INTEGER; i,j: LONGINT;  (* polpo: i, j byte offsets in a row, LONGINT *)
 		x: LONGINT;
 	BEGIN
 		i:= sourceRow;
@@ -2305,7 +2307,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 												inputRow: LONGINT; outputBuf: JSampArray;
 												outRowCtr: LONGINT; numRows:INTEGER);
 	VAR
-		y,cb,cr,x,test: INTEGER;
+		y,cb,cr,test: INTEGER; x: LONGINT;  (* polpo: x a byte offset in a row *)
 		outptr,inptr0,inptr1,inptr2: JSampRow;
 		col,numCols,out: LONGINT;
 	BEGIN
@@ -2345,7 +2347,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 												inputRow: LONGINT; outputBuf: JSampArray;
 												outRowCtr: LONGINT; numRows:INTEGER);
 	VAR
-		x: INTEGER;
+		x: LONGINT;  (* polpo: a byte offset in a row *)
 		outptr,inptr: JSampRow;
 		numCols,count,out: LONGINT;
 	BEGIN
@@ -2499,7 +2501,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 	VAR
 		inptr,outptr : JSampRow;
 		invalue: CHAR;
-		h,outOffset,inOffset,outend,hExpand,vExpand,inrow,outrow : INTEGER;
+		h,hExpand,vExpand,inrow,outrow : INTEGER; outOffset,inOffset,outend: LONGINT;  (* polpo: offsets LONGINT *)
 	BEGIN
 		hExpand := cInfo.upsample.hExpand[compptr.componentIndex];
 		vExpand := cInfo.upsample.vExpand[compptr.componentIndex];
@@ -2508,7 +2510,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 		WHILE outrow < (cInfo.maxVSampFactor) DO
 			inptr := inputData.row[inrow];
 			outptr := outputData.row[outrow];
-			outend := SHORT(cInfo.outputWidth);
+			outend := cInfo.outputWidth;
 			outOffset := 0;
 			inOffset := 0;
 			WHILE outOffset < outend DO
@@ -2534,13 +2536,13 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 	VAR
 		inptr,outptr : JSampRow;
 		invalue: CHAR;
-		h,outOffset,inOffset,outend,inrow : INTEGER;
+		h,inrow : INTEGER; outOffset,inOffset,outend: LONGINT;  (* polpo: offsets LONGINT *)
 	BEGIN
 		inrow := SHORT(inRowCtr);
 		FOR h := 0 TO cInfo.maxVSampFactor - 1 DO
 			inptr := inputData.row[inrow];
 			outptr := outputData.row[h];
-			outend := SHORT(cInfo.outputWidth);
+			outend := cInfo.outputWidth;
 			outOffset := 0;
 			inOffset := 0;
 			WHILE outOffset < outend DO
@@ -2562,14 +2564,14 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 	VAR
 		inptr,outptr : JSampRow;
 		invalue: CHAR;
-		outOffset,inOffset,outend,inrow,outrow : INTEGER;
+		inrow,outrow : INTEGER; outOffset,inOffset,outend: LONGINT;  (* polpo: offsets LONGINT *)
 	BEGIN
 		inrow := SHORT(inRowCtr);
 		outrow := 0;
 		WHILE outrow < (cInfo.maxVSampFactor) DO
 			inptr := inputData.row[inrow];
 			outptr := outputData.row[outrow];
-			outend := SHORT(cInfo.outputWidth);
+			outend := cInfo.outputWidth;
 			outOffset := 0;
 			inOffset := 0;
 			WHILE outOffset < outend DO
@@ -2594,7 +2596,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 	VAR
 		inptr,outptr : JSampRow;
 		invalue: CHAR;
-		outOffset,inOffset,inrow,invalueb : INTEGER;
+		inrow,invalueb : INTEGER; outOffset,inOffset: LONGINT;  (* polpo: offsets LONGINT *)
 		colctr: LONGINT;
 	BEGIN
 		inrow := SHORT(inRowCtr);
@@ -2685,7 +2687,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 			IF needBuffer THEN
 				NEW(cInfo.upsample.colorBuf[ci]);
 				FOR i:= 0 TO cInfo.maxVSampFactor DO
-					NEW(cInfo.upsample.colorBuf[ci].row[i]);
+					NEW(cInfo.upsample.colorBuf[ci].row[i], rowLen);
 				END;
 			END;
 		END;
@@ -2793,7 +2795,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 	PROCEDURE colorQuantize(cInfo: CInfoPtr; inputBuf: JSampArray; outputBuf: JSampArray; 
 											outRowCtr:INTEGER; numRows: INTEGER);
 	VAR
-		pixcode,nc,ci,row,inOffset,outOffset: INTEGER;
+		pixcode,nc,ci,row: INTEGER; inOffset,outOffset: LONGINT;  (* polpo: offsets LONGINT *)
 		ptrin,ptrout: JSampRow;
 		col,width: LONGINT;
 	BEGIN
@@ -2820,7 +2822,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 	PROCEDURE colorQuantize3(cInfo: CInfoPtr; inputBuf: JSampArray; outputBuf: JSampArray; 
 											outRowCtr:INTEGER; numRows: INTEGER);
 	VAR
-		pixcode,row,inOffset,outOffset: INTEGER;
+		pixcode,row: INTEGER; inOffset,outOffset: LONGINT;  (* polpo: offsets LONGINT *)
 		ptrin,ptrout: JSampRow;
 		col,width: LONGINT;
 	BEGIN
@@ -2847,8 +2849,8 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 	PROCEDURE quantizeFSDither(cInfo: CInfoPtr; inputBuf: JSampArray; outputBuf: JSampArray; 
 											outRowCtr:INTEGER; numRows: INTEGER);
 	VAR
-		cur,belowerr,bpreverr,bnexterr,delta,pixcode,nc,dir,dirnc,ci,row,inOffset,outOffset,errOffset: INTEGER;
-		(*es*) bmpOffset: INTEGER; bmpRows0: JSampRowList; (**)
+		cur,belowerr,bpreverr,bnexterr,delta,pixcode,nc,dir,dirnc,ci,row: INTEGER; inOffset,outOffset,errOffset: LONGINT;  (* polpo *)
+		(*es*) bmpOffset: LONGINT; bmpRows0: JSampRowList; (**)  (* polpo: LONGINT *)
 		errorPtr: FSErrPtr;
 		inputPtr,outputPtr: JSampRow;
 		col,width,j: LONGINT;
@@ -2860,8 +2862,9 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 		width := cInfo.outputWidth;
 		FOR row := 0 TO numRows - 1 DO
 			(*es*  bmpOffset := 0; inputPtr := inputBuf.row[row];  **)
-			(*es*) NEW(bmpRows0);  bmpRows0.next := bmpRows;  NEW(bmpRows0.row);
-			bmpRows0.row^ := inputBuf.row[row]^; bmpRows := bmpRows0;  (**)
+			(*es*) NEW(bmpRows0);  bmpRows0.next := bmpRows;  NEW(bmpRows0.row, rowLen);
+			FOR j := 0 TO rowLen - 1 DO bmpRows0.row[j] := inputBuf.row[row][j] END;  (* polpo: was row^ := row^ *)
+			bmpRows := bmpRows0;  (**)
 			FOR j:= 0 TO width -1 DO 
 				outputBuf.row[row + outRowCtr][j] := CHR(0);
 				(*es*
@@ -2876,12 +2879,12 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 				outputPtr := outputBuf.row[row + outRowCtr];
 				outOffset := 0;
 				IF cInfo.cquant.onOddRow THEN
-					inOffset := SHORT(LONG(inOffset) + (width - 1) *nc);
-					outOffset := SHORT(LONG(outOffset) + width -1);
+					inOffset := inOffset + (width - 1) * nc;
+					outOffset := outOffset + width - 1;
 					dir := -1;
 					dirnc := -nc;
 					errorPtr := cInfo.cquant.fsErrors[ci];
-					errOffset := SHORT(width + 1);
+					errOffset := width + 1;
 				ELSE
 					dir := 1;
 					dirnc := nc;
@@ -2924,15 +2927,15 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 	(* Initialisierung fuer die 1-Pass Quantifizierung *)
 	PROCEDURE jinit1PassQuantizer(cInfo: CInfoPtr);
 	VAR
-		i,j: INTEGER;
+		i: INTEGER; j: LONGINT;  (* polpo: j up to the output width *)
 	BEGIN
 		NEW(cInfo.cquant);
 		IF cInfo.ditherMode = DitherFS THEN
 			cInfo.cquant.colorQuantize := quantizeFSDither;
 			cInfo.cquant.onOddRow := FALSE;
 			FOR i:= 0 TO cInfo.outColorComponents - 1 DO
-				NEW(cInfo.cquant.fsErrors[i]);
-				FOR j:= 0 TO JPEGMAXDIMENSION + 1 DO
+				NEW(cInfo.cquant.fsErrors[i], cInfo.outputWidth + 2);
+				FOR j:= 0 TO cInfo.outputWidth + 1 DO
 					cInfo.cquant.fsErrors[i][j] := 0;
 				END;
 			END;
@@ -2996,7 +2999,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 		ELSE
 			NEW(cInfo.post.buffer);
 			FOR i:=0 TO cInfo.maxVSampFactor -1 DO
-				NEW(cInfo.post.buffer.row[i]);
+				NEW(cInfo.post.buffer.row[i], rowLen);
 			END;
 		END;
 	END jinitDPostController;
@@ -3076,7 +3079,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 			rgroup := SHORT(t);
 			NEW(cInfo.main.buffer.comp[ci]);
 			FOR i:=0 TO LONG(rgroup) * LONG(ngroups) -1 DO
-				NEW(cInfo.main.buffer.comp[ci].row[i]);
+				NEW(cInfo.main.buffer.comp[ci].row[i], rowLen);
 			END
 		END;
 	END jinitDMainController;
@@ -3458,7 +3461,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 		dest.padBytes := SHORT(rowWidth - dest.dataWidth);
 		
 		NEW(dest.buffer);
-		NEW(dest.buffer.row[0]);
+		NEW(dest.buffer.row[0], rowLen);
 	END jinitDest;
 	
 	(* *****        Ende Prozeduren von JPEGOut        ***** *)
@@ -3653,7 +3656,7 @@ Out.String("  MCUColNum"); Out.Int(lastMCUCol - cInfo.coef.MCUColNum, 5); Out.Ln
 		dest: DestPtr;
 		numScanlines: LONGINT;
 		zaehler: LONGINT;
-		(*es*) rowOffset, i: INTEGER;
+		(*es*) rowOffset, i: LONGINT;  (* polpo: rowOffset a byte offset in a row, LONGINT *)
 		(* von BMPImages.Load24 *)
 		VAR w,h, y, dy, x, p: LONGINT; align: ARRAY 3 OF CHAR;
 	BEGIN
